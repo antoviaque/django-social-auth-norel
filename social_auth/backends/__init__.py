@@ -19,7 +19,7 @@ from openid.extensions import sreg, ax
 from oauth2 import Consumer as OAuthConsumer, Token, Request as OAuthRequest
 
 from django.contrib.auth import authenticate
-from django.contrib.auth.backends import ModelBackend
+from permission_backend_nonrel.backends import NonrelPermissionBackend as ModelBackend
 from django.utils import simplejson
 from django.utils.importlib import import_module
 
