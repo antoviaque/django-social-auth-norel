@@ -8,7 +8,7 @@ urlpatterns = patterns('',
     # authentication
     url(r'^login/(?P<backend>[^/]+)/$', auth,
         name='socialauth_begin'),
-    url(r'^complete/(?P<backend>[^/]+)/$', complete,
+    url(r'^oauth/callback/(?P<backend>[^/]+)/$', complete,
         name='socialauth_complete'),
 
     # XXX: Deprecated, this URLs are deprecated, instead use the login and
