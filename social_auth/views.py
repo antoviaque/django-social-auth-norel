@@ -12,9 +12,10 @@ from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 
 from social_auth.utils import sanitize_redirect, setting, \
-                              backend_setting, clean_partial_pipeline
+                              backend_setting, clean_partial_pipeline, log
 from social_auth.decorators import dsa_view
 
+import time
 
 DEFAULT_REDIRECT = setting('SOCIAL_AUTH_LOGIN_REDIRECT_URL') or \
                    setting('LOGIN_REDIRECT_URL')
@@ -165,5 +166,9 @@ def auth_complete(request, backend, user=None, *args, **kwargs):
                                                       *args, **kwargs)
         return backend.continue_pipeline(pipeline_index=idx, *args, **kwargs)
     else:
-        return backend.auth_complete(user=user, request=request, *args,
+        start = time.time()
+        resp = backend.auth_complete(user=user, request=request, *args,
                                      **kwargs)
+        duration = time.time() - start
+        log('debug', "Time to auth for %s was %s sec" % (backend.AUTH_BACKEND.name, duration))
+        return resp
