@@ -2,7 +2,7 @@
 Mock backends.
 """
 from social_auth.backends import OAuthBackend, BaseOAuth2, USERNAME
-from social_auth.utils import log
+#from social_auth.utils import log
 from django.contrib.auth import authenticate
 from django.conf import settings
 
@@ -39,10 +39,14 @@ class MockOAuth2(BaseOAuth2):
         Allow us to mock out the user inside the auth url.
 
         All values desired for user are passed URL-encoded.
+
+        "sleep" is a special case that will cause this to hang for the specified
+        number of milliseconds.
         """
         root_auth_url = super(MockOAuth2, self).auth_url()
         path, query_str = urllib.splitquery(root_auth_url)
         query = dict(urlparse.parse_qsl(query_str))
+
         for k, v in self.request.REQUEST.iteritems():
             query['mock_%s' % k] = v
 
@@ -52,8 +56,6 @@ class MockOAuth2(BaseOAuth2):
         """
         Fake out the login completion.  This would be one request.
         """
-        time.sleep(1) # HTTP request to provider
-
         self.validate_state()
 
         response = {}
@@ -70,11 +72,14 @@ class MockOAuth2(BaseOAuth2):
         """
         Fake out gathering user data.  This would be another request.
         """
-        time.sleep(1) # HTTP request to provider
+        # Simulate wait for HTTP request to provider in milliseconds
+        req = self.request.REQUEST
+        if 'mock_sleep' in req:
+            time.sleep(float(req['mock_sleep']) / 1000)
 
         user_data = {}
-        for k, v in self.request.REQUEST.iteritems():
-            if k.startswith('mock_'):
+        for k, v in req.iteritems():
+            if k.startswith('mock_') and k != 'mock_sleep':
                 user_data[k[5:]] = v
         return user_data
 
