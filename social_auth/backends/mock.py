@@ -2,9 +2,12 @@
 Mock backends.
 """
 from social_auth.backends import OAuthBackend, BaseOAuth2, USERNAME
+from social_auth.utils import log
 from django.contrib.auth import authenticate
-from urllib import urlencode
+from django.conf import settings
 
+import urllib
+import urlparse
 import time
 
 class MockOAuth2Backend(OAuthBackend):
@@ -15,11 +18,13 @@ class MockOAuth2Backend(OAuthBackend):
 
     def get_user_details(self, response):
         email = response.get('email', '')
-        return {USERNAME: email.split('@', 1)[0],
-                'email': email,
-                'fullname': response.get('fullname', ''),
-                'first_name': response.get('first_name', ''),
-                'last_name': response.get('last_name', '')},
+        return {
+            USERNAME: email.split('@', 1)[0],
+            'email': email,
+            'fullname': response.get('fullname', ''),
+            'first_name': response.get('first_name', ''),
+            'last_name': response.get('last_name', '')
+        }
 
 class MockOAuth2(BaseOAuth2):
     """Mock OAuth 2"""
@@ -27,33 +32,27 @@ class MockOAuth2(BaseOAuth2):
     SETTINGS_KEY_NAME = 'MOCK_OAUTH2_CLIENT_KEY'
     SETTINGS_SECRET_NAME = 'MOCK_OAUTH2_CLIENT_SECRET'
     REDIRECT_STATE = False
-    #AUTHORIZATION_URL = '/oauth/callback/mock-oauth2/'
+    AUTHORIZATION_URL = '/oauth/callback/mock-oauth2/'
 
     def auth_url(self):
         """
-        Fake redirect URL -- goes straight to confirmation.
+        Allow us to mock out the user inside the auth url.
+
+        All values desired for user are passed URL-encoded.
         """
-        state = self.state_token()
+        root_auth_url = super(MockOAuth2, self).auth_url()
+        path, query_str = urllib.splitquery(root_auth_url)
+        query = dict(urlparse.parse_qsl(query_str))
+        for k, v in self.request.REQUEST.iteritems():
+            query['mock_%s' % k] = v
 
-        # Store state in session for further request validation. The state
-        # value is passed as state parameter (as specified in OAuth2 spec), but
-        # also added to redirect_uri, that way we can still verify the request
-        # if the provider doesn't implement the state parameter.
-        self.request.session[self.AUTH_BACKEND.name + '_state'] = state
-
-        args = {
-            'state': state,
-            'code': 'foobar',
-            'redirect_uri': self.get_redirect_uri(state),
-            'response_type': 'code'
-        }
-        return '/oauth/callback/mock-oauth2/?' + urlencode(args)
+        return "%s?%s" % (path, urllib.urlencode(query))
 
     def auth_complete(self, *args, **kwargs):
         """
         Fake out the login completion.  This would be one request.
         """
-        time.sleep(1)
+        time.sleep(1) # HTTP request to provider
 
         self.validate_state()
 
@@ -70,30 +69,23 @@ class MockOAuth2(BaseOAuth2):
     def user_data(self, access_token, *args, **kwargs):
         """
         Fake out gathering user data.  This would be another request.
-
-        TODO: method for populating this data
         """
-        time.sleep(1)
-        return {
-            "access_token": access_token,
-            "expires_in": 3600,
-            "expires": 3600,
-            "id": "00000000000000",
-            "email": "fred.example@gmail.com",
-            "fullname": "Fred Example",
-            "first_name": "Fred",
-            "last_name": "Example",
-            "picture": "https://lh5.googleusercontent.com/-2Sv-4bBMLLA/AAAAAAAAAAI/AAAAAAAAABo/bEG4kI2mG0I/photo.jpg",
-            "gender": "male",
-            "locale": "en-US"
-        }
+        time.sleep(1) # HTTP request to provider
+
+        user_data = {}
+        for k, v in self.request.REQUEST.iteritems():
+            if k.startswith('mock_'):
+                user_data[k[5:]] = v
+        return user_data
 
     @classmethod
     def enabled(self):
         """
-        TODO: only enable this in debug mode?
+        Only enabled in debug mode
         """
-        return True
+        if settings.DEBUG:
+            return True
+        return False
 
 
 BACKENDS = {
