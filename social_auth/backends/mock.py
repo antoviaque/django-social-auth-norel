@@ -5,6 +5,7 @@ from social_auth.backends import OAuthBackend, BaseOAuth2, USERNAME
 #from social_auth.utils import log
 from django.contrib.auth import authenticate
 from django.conf import settings
+from urllib2 import Request, urlopen
 
 import urllib
 import urlparse
@@ -42,6 +43,8 @@ class MockOAuth2(BaseOAuth2):
 
         "sleep" is a special case that will cause this to hang for the specified
         number of milliseconds.
+
+        "request" is a special case that will hit the specified remote url.
         """
         root_auth_url = super(MockOAuth2, self).auth_url()
         path, query_str = urllib.splitquery(root_auth_url)
@@ -77,9 +80,13 @@ class MockOAuth2(BaseOAuth2):
         if 'mock_sleep' in req:
             time.sleep(float(req['mock_sleep']) / 1000)
 
+        if 'mock_request' in req:
+            request = Request(req['mock_request'])
+            urlopen(request).read()
+
         user_data = {}
         for k, v in req.iteritems():
-            if k.startswith('mock_') and k != 'mock_sleep':
+            if k.startswith('mock_') and not k in ('mock_sleep', 'mock_request'):
                 user_data[k[5:]] = v
         return user_data
 
