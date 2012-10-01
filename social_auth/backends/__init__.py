@@ -9,7 +9,8 @@ Also the modules *must* define a BACKENDS dictionary with the backend name
 (which is used for URLs matching) and Auth class, otherwise it won't be
 enabled.
 """
-from urllib2 import Request, urlopen, HTTPError
+from urllib2 import urlopen, HTTPError
+import requests
 from urllib import urlencode
 
 from openid.consumer.consumer import Consumer, SUCCESS, CANCEL, FAILURE
@@ -35,7 +36,6 @@ from social_auth.backends.exceptions import StopPipeline, AuthException, \
                                             AuthStateMissing, \
                                             AuthStateForbidden
 from social_auth.backends.utils import build_consumer_oauth_request
-
 
 # OpenID configuration
 OLD_AX_ATTRS = [
@@ -87,37 +87,44 @@ class SocialAuthBackend(ModelBackend):
         verification is made by kwargs inspection for current backend
         name presence.
         """
-        # Validate backend and arguments. Require that the Social Auth
-        # response be passed in as a keyword argument, to make sure we
-        # don't match the username/password calling conventions of
-        # authenticate.
-        if not (self.name and kwargs.get(self.name) and 'response' in kwargs):
-            return None
 
-        response = kwargs.get('response')
-        pipeline = PIPELINE
-        kwargs = kwargs.copy()
-        kwargs['backend'] = self
+        try:
+            # Validate backend and arguments. Require that the Social Auth
+            # response be passed in as a keyword argument, to make sure we
+            # don't match the username/password calling conventions of
+            # authenticate.
+            if not (self.name and kwargs.get(self.name) and 'response' in kwargs):
+                return None
 
-        if 'pipeline_index' in kwargs:
-            pipeline = pipeline[kwargs['pipeline_index']:]
-        else:
-            kwargs['details'] = self.get_user_details(response)
-            kwargs['uid'] = self.get_user_id(kwargs['details'], response)
-            kwargs['is_new'] = False
+            response = kwargs.get('response')
+            pipeline = PIPELINE
+            kwargs = kwargs.copy()
+            kwargs['backend'] = self
 
-        out = self.pipeline(pipeline, *args, **kwargs)
-        if not isinstance(out, dict):
-            return out
+            if 'pipeline_index' in kwargs:
+                pipeline = pipeline[kwargs['pipeline_index']:]
+            else:
+                kwargs['details'] = self.get_user_details(response)
+                kwargs['uid'] = self.get_user_id(kwargs['details'], response)
+                kwargs['is_new'] = False
 
-        social_user = out.get('social_user')
-        if social_user:
-            # define user.social_user attribute to track current social
-            # account
-            user = social_user.user
-            user.social_user = social_user
-            user.is_new = out.get('is_new')
-            return user
+            out = self.pipeline(pipeline, *args, **kwargs)
+            if not isinstance(out, dict):
+                return out
+
+            social_user = out.get('social_user')
+            if social_user:
+                # define user.social_user attribute to track current social
+                # account
+                user = social_user.user
+                user.social_user = social_user
+                user.is_new = out.get('is_new')
+                return user
+        except Exception as e:
+            import traceback
+            log('warn', 'Uncaught exception in authenticate: %s' % e)
+            log('warn', 'Traceback: %s' % traceback.format_exc())
+            raise
 
     def pipeline(self, pipeline, *args, **kwargs):
         """Pipeline"""
@@ -721,16 +728,19 @@ class BaseOAuth2(BaseOAuth):
         }
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                     'Accept': 'application/json'}
-        request = Request(self.ACCESS_TOKEN_URL, data=urlencode(params),
-                          headers=headers)
+        #request = Request(self.ACCESS_TOKEN_URL, data=urlencode(params),
+        #                  headers=headers)
 
         try:
-            response = simplejson.loads(urlopen(request).read())
-        except HTTPError, e:
-            if e.code == 400:
-                raise AuthCanceled(self)
+            #response = simplejson.loads(urlopen(request).read())
+            http_response = requests.post(self.ACCESS_TOKEN_URL,
+                                          data=params,
+                                          headers=headers)
+
+            if http_response.status_code == 200:
+                response = simplejson.loads(http_response.text)
             else:
-                raise
+                raise AuthCanceled(self)
         except (ValueError, KeyError):
             raise AuthUnknownError(self)
 
@@ -739,6 +749,7 @@ class BaseOAuth2(BaseOAuth):
             raise AuthFailed(self, error)
         else:
             data = self.user_data(response['access_token'], response)
+
             response.update(data or {})
             kwargs.update({
                 'auth': self,

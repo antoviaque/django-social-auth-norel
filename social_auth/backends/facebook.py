@@ -13,7 +13,8 @@ field, check OAuthBackend class for details on how to extend it.
 """
 import cgi
 from urllib import urlencode
-from urllib2 import urlopen, HTTPError
+#from urllib2 import urlopen, HTTPError
+import requests
 import base64
 import hmac
 import hashlib
@@ -71,12 +72,16 @@ class FacebookAuth(BaseOAuth2):
         url = FACEBOOK_ME + urlencode(params)
 
         try:
-            data = simplejson.load(urlopen(url))
+            response = requests.get(url)
+            if response.status_code == 200:
+                data = simplejson.loads(response.text)
+            else:
+                raise AuthTokenError()
         except ValueError:
             extra = {'access_token': sanitize_log_data(access_token)}
             log('error', 'Could not load user data from Facebook.',
                 exc_info=True, extra=extra)
-        except HTTPError:
+        except requests.RequestException:
             extra = {'access_token': sanitize_log_data(access_token)}
             log('error', 'Error validating access token.',
                 exc_info=True, extra=extra)
@@ -101,8 +106,13 @@ class FacebookAuth(BaseOAuth2):
                 'code': self.data['code']
             })
             try:
-                response = cgi.parse_qs(urlopen(url).read())
-            except HTTPError:
+                http_response = requests.get(url)
+                if http_response.status_code == 200:
+                    response = cgi.parse_qs(http_response.text)
+                else:
+                    raise AuthFailed(self, 'There was an error authenticating ' \
+                                           'the app')
+            except requests.RequestException:
                 raise AuthFailed(self, 'There was an error authenticating ' \
                                        'the app')
 

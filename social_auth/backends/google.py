@@ -13,7 +13,7 @@ APIs console https://code.google.com/apis/console/ Identity option.
 
 OpenID also works straightforward, it doesn't need further configurations.
 """
-from urllib import urlencode
+#from urllib import urlencode
 from urllib2 import Request, urlopen
 
 from oauth2 import Request as OAuthRequest
@@ -24,6 +24,8 @@ from social_auth.utils import setting
 from social_auth.backends import OpenIdAuth, ConsumerBasedOAuth, BaseOAuth2, \
                                  OAuthBackend, OpenIDBackend, USERNAME
 from social_auth.backends.exceptions import AuthFailed
+
+import requests
 
 
 # Google OAuth base configuration
@@ -225,10 +227,13 @@ def googleapis_profile(url, access_token):
     https://developers.google.com/accounts/docs/OAuth2Login
     """
     data = {'access_token': access_token, 'alt': 'json'}
-    request = Request(url + '?' + urlencode(data))
     try:
-        return simplejson.loads(urlopen(request).read())
-    except (ValueError, KeyError, IOError):
+        response = requests.get(url, params=data)
+        if response.status_code == 200:
+            return simplejson.loads(response.text)
+        else:
+            return None
+    except (ValueError, KeyError, requests.RequestException):
         return None
 
 
