@@ -5,8 +5,9 @@ from social_auth.backends import OAuthBackend, BaseOAuth2, USERNAME
 #from social_auth.utils import log
 from django.contrib.auth import authenticate
 from django.conf import settings
-from urllib2 import Request, urlopen
+#from urllib2 import Request, urlopen
 
+import requests
 import urllib
 import urlparse
 import time
@@ -81,8 +82,10 @@ class MockOAuth2(BaseOAuth2):
             time.sleep(float(req['mock_sleep']) / 1000)
 
         if 'mock_request' in req:
-            request = Request(req['mock_request'])
-            urlopen(request).read()
+            #request = Request(req['mock_request'])
+            #urlopen(request).read()
+            resp = requests.get(req['mock_request'])
+            resp.text
 
         user_data = {}
         for k, v in req.iteritems():
