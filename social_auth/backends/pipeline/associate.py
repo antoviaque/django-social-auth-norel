@@ -13,7 +13,8 @@ def associate_by_email(details, user=None, *args, **kwargs):
 
     email = details.get('email')
 
-    warn_setting('SOCIAL_AUTH_ASSOCIATE_BY_MAIL', 'associate_by_email')
+    # Don't spam with a warning, this doesn't apply when providers check emails
+    #warn_setting('SOCIAL_AUTH_ASSOCIATE_BY_MAIL', 'associate_by_email')
 
     if email and setting('SOCIAL_AUTH_ASSOCIATE_BY_MAIL', False):
         # try to associate accounts registered with the same email address,
