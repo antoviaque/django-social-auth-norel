@@ -111,7 +111,10 @@ class FacebookAuth(BaseOAuth2):
                     response = cgi.parse_qs(http_response.text)
                 else:
                     raise AuthFailed(self, 'There was an error authenticating ' \
-                                           'the app')
+                                           'the app (status={0}, body={1})'\
+                                           .format(http_response.status_code,
+                                                   http_response.text)
+                                           )
             except requests.RequestException:
                 raise AuthFailed(self, 'There was an error authenticating ' \
                                        'the app')
